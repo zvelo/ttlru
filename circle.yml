@@ -1,0 +1,17 @@
+dependencies:
+  cache_directories:
+    - ~/.go_workspace/bin
+
+  override:
+    - if [[ ! -e ~/.go_workspace/bin/gocov ]]; then go get -v github.com/axw/gocov/gocov; fi
+    - if [[ ! -e ~/.go_workspace/bin/goveralls ]]; then go get -v github.com/mattn/goveralls; fi
+    - go get -t -d -v ./...
+
+checkout:
+  post:
+    - mkdir -p $HOME/.go_workspace/src/_/home/ubuntu
+    - ln -sf `pwd` $HOME/.go_workspace/src/_/home/ubuntu
+
+test:
+  override:
+    - make coveralls
