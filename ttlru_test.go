@@ -94,5 +94,50 @@ func TestTTL(t *testing.T) {
 			So(l.Len(), ShouldEqual, 1)
 			So(l.Cap(), ShouldEqual, 1)
 		})
+
+		Convey("Invalid creation", func() {
+			So(New(0, 1), ShouldBeNil)
+			So(New(1, 0), ShouldBeNil)
+			So(New(-1, 1), ShouldBeNil)
+			So(New(1, -1), ShouldBeNil)
+		})
+
+		Convey("Set should also update", func() {
+			l := New(1, 2*time.Second)
+			So(l, ShouldNotBeNil)
+			So(l.Len(), ShouldEqual, 0)
+			So(l.Cap(), ShouldEqual, 1)
+
+			So(l.Set(1, 1), ShouldBeFalse)
+			So(l.Len(), ShouldEqual, 1)
+			So(l.Cap(), ShouldEqual, 1)
+			v, ok := l.Get(1)
+			So(ok, ShouldBeTrue)
+			So(v, ShouldEqual, 1)
+
+			So(l.Set(1, 2), ShouldBeFalse)
+			So(l.Len(), ShouldEqual, 1)
+			So(l.Cap(), ShouldEqual, 1)
+			v, ok = l.Get(1)
+			So(ok, ShouldBeTrue)
+			So(v, ShouldEqual, 2)
+		})
+
+		Convey("Delete should return properly", func() {
+			l := New(1, 2*time.Second)
+			So(l, ShouldNotBeNil)
+			So(l.Len(), ShouldEqual, 0)
+			So(l.Cap(), ShouldEqual, 1)
+
+			So(l.Set(1, 1), ShouldBeFalse)
+			So(l.Len(), ShouldEqual, 1)
+			So(l.Cap(), ShouldEqual, 1)
+			v, ok := l.Get(1)
+			So(ok, ShouldBeTrue)
+			So(v, ShouldEqual, 1)
+
+			So(l.Del(1), ShouldBeTrue)
+			So(l.Del(2), ShouldBeFalse)
+		})
 	})
 }
