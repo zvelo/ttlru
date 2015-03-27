@@ -18,7 +18,7 @@ coverage: .acc.out
 .acc.out: $(GO_FILES)
 	@echo "mode: set" > .acc.out
 	@for pkg in $(GO_PKGS); do \
-		cmd="go test -v -race -coverprofile=profile.out $$pkg"; \
+		cmd="go test -v -coverprofile=profile.out $$pkg"; \
 		eval $$cmd; \
 		if test $$? -ne 0; then \
 			exit 1; \
