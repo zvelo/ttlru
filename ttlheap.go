@@ -12,8 +12,7 @@ func (h ttlHeap) Less(i, j int) bool {
 
 func (h ttlHeap) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
-	h[i].index = i
-	h[j].index = j
+	h[i].index, h[j].index = i, j
 }
 
 func (h *ttlHeap) Push(x interface{}) {
