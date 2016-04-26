@@ -139,5 +139,34 @@ func TestTTL(t *testing.T) {
 			So(l.Del(1), ShouldBeTrue)
 			So(l.Del(2), ShouldBeFalse)
 		})
+
+		Convey("Item should expired despite Get()", func() {
+			l := New(1, 300*time.Millisecond)
+			So(l, ShouldNotBeNil)
+			So(l.Set(1, 1), ShouldBeFalse)
+			l.NoReset = true
+
+			done := make(chan interface{})
+			time.AfterFunc(200*time.Millisecond, func() {
+				Convey("Get() item works", t, func() {
+					v, ok := l.Get(1)
+					So(ok, ShouldBeTrue)
+					So(v, ShouldEqual, 1)
+					done <- true
+				})
+			})
+			<-done
+
+			time.AfterFunc(200*time.Millisecond, func() {
+				Convey("Item is gone despite the Get()", t, func() {
+					v, ok := l.Get(1)
+					So(ok, ShouldBeFalse)
+					So(v, ShouldBeNil)
+					done <- true
+				})
+			})
+			<-done
+
+		})
 	})
 }
