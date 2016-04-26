@@ -27,11 +27,12 @@ type entry struct {
 
 // Cache is the type that implements the ttlru
 type Cache struct {
-	cap   int
-	ttl   time.Duration
-	items map[interface{}]*entry
-	heap  *ttlHeap
-	lock  sync.RWMutex
+	cap     int
+	ttl     time.Duration
+	items   map[interface{}]*entry
+	heap    *ttlHeap
+	lock    sync.RWMutex
+	NoReset bool
 }
 
 // New creates a new Cache with cap entries that expire after ttl has
@@ -144,7 +145,9 @@ func (c *Cache) Get(key interface{}) (interface{}, bool) {
 		// the item should be automatically removed when it expires, but we
 		// check just to be safe
 		if time.Now().Before(ent.expires) {
-			c.resetEntryTTL(ent)
+			if c.NoReset != true {
+				c.resetEntryTTL(ent)
+			}
 			return ent.value, true
 		}
 	}
