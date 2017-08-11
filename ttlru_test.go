@@ -10,7 +10,7 @@ import (
 func TestTTL(t *testing.T) {
 	Convey("TestTTL", t, func() {
 		Convey("General functionality", func() {
-			l := New(128, 2*time.Second)
+			l := New(128, WithTTL(2*time.Second))
 			So(l, ShouldNotBeNil)
 			So(l.Len(), ShouldEqual, 0)
 			So(l.Cap(), ShouldEqual, 128)
@@ -81,7 +81,7 @@ func TestTTL(t *testing.T) {
 		})
 
 		Convey("Add returns properly", func() {
-			l := New(1, 2*time.Second)
+			l := New(1, WithTTL(2*time.Second))
 			So(l, ShouldNotBeNil)
 			So(l.Len(), ShouldEqual, 0)
 			So(l.Cap(), ShouldEqual, 1)
@@ -96,14 +96,13 @@ func TestTTL(t *testing.T) {
 		})
 
 		Convey("Invalid creation", func() {
-			So(New(0, 1), ShouldBeNil)
-			So(New(1, 0), ShouldBeNil)
-			So(New(-1, 1), ShouldBeNil)
-			So(New(1, -1), ShouldBeNil)
+			So(New(0, WithTTL(1)), ShouldBeNil)
+			So(New(-1, WithTTL(1)), ShouldBeNil)
+			So(New(1, WithTTL(-1)), ShouldBeNil)
 		})
 
 		Convey("Set should also update", func() {
-			l := New(1, 2*time.Second)
+			l := New(1, WithTTL(2*time.Second))
 			So(l, ShouldNotBeNil)
 			So(l.Len(), ShouldEqual, 0)
 			So(l.Cap(), ShouldEqual, 1)
@@ -124,7 +123,7 @@ func TestTTL(t *testing.T) {
 		})
 
 		Convey("Delete should return properly", func() {
-			l := New(1, 2*time.Second)
+			l := New(1, WithTTL(2*time.Second))
 			So(l, ShouldNotBeNil)
 			So(l.Len(), ShouldEqual, 0)
 			So(l.Cap(), ShouldEqual, 1)
@@ -141,10 +140,10 @@ func TestTTL(t *testing.T) {
 		})
 
 		Convey("Item should expired despite Get()", func() {
-			l := New(1, 300*time.Millisecond)
+			l := New(1, WithTTL(300*time.Millisecond))
 			So(l, ShouldNotBeNil)
 			So(l.Set(1, 1), ShouldBeFalse)
-			l.NoReset = true
+			l.(*cache).NoReset = true
 
 			done := make(chan interface{})
 			time.AfterFunc(200*time.Millisecond, func() {
@@ -166,7 +165,34 @@ func TestTTL(t *testing.T) {
 				})
 			})
 			<-done
+		})
 
+		Convey("Without ttl", func() {
+			l := New(2)
+			So(l, ShouldNotBeNil)
+
+			So(l.Set(1, 1), ShouldBeFalse)
+			v, ok := l.Get(1)
+			So(ok, ShouldBeTrue)
+			So(v, ShouldEqual, 1)
+
+			So(l.Set(2, 2), ShouldBeFalse)
+			v, ok = l.Get(2)
+			So(ok, ShouldBeTrue)
+			So(v, ShouldEqual, 2)
+
+			So(l.Set(3, 3), ShouldBeTrue)
+			v, ok = l.Get(3)
+			So(ok, ShouldBeTrue)
+			So(v, ShouldEqual, 3)
+
+			v, ok = l.Get(1)
+			So(ok, ShouldBeFalse)
+			So(v, ShouldBeNil)
+
+			v, ok = l.Get(2)
+			So(ok, ShouldBeTrue)
+			So(v, ShouldEqual, 2)
 		})
 	})
 }

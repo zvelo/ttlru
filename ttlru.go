@@ -25,8 +25,42 @@ type entry struct {
 	timer   *time.Timer
 }
 
-// Cache is the type that implements the ttlru
-type Cache struct {
+type Cache interface {
+	// Set a key with value to the cache. Returns true if an item was
+	// evicted.
+	Set(key, value interface{}) bool
+
+	// Get an item from the cache by key. Returns the value if it exists,
+	// and a bool stating whether or not it existed.
+	Get(key interface{}) (interface{}, bool)
+
+	// Keys returns a slice of all the keys in the cache
+	Keys() []interface{}
+
+	// Len returns the number of items present in the cache
+	Len() int
+
+	// Cap returns the total number of items the cache can retain
+	Cap() int
+
+	// Purge removes all items from the cache
+	Purge()
+
+	// Del deletes an item from the cache by key. Returns if an item was
+	// actually deleted.
+	Del(key interface{}) bool
+}
+
+type Option func(*cache)
+
+func WithTTL(val time.Duration) Option {
+	return func(c *cache) {
+		c.ttl = val
+	}
+}
+
+// cache is the type that implements the ttlru
+type cache struct {
 	cap     int
 	ttl     time.Duration
 	items   map[interface{}]*entry
@@ -37,27 +71,28 @@ type Cache struct {
 
 // New creates a new Cache with cap entries that expire after ttl has
 // elapsed since the item was added, modified or accessed.
-func New(cap int, ttl time.Duration) *Cache {
-	if cap <= 0 || ttl <= 0 {
+func New(cap int, opts ...Option) Cache {
+	c := cache{cap: cap}
+
+	for _, opt := range opts {
+		opt(&c)
+	}
+
+	if c.cap <= 0 || c.ttl < 0 {
 		return nil
 	}
 
-	c := &Cache{
-		cap:   cap,
-		ttl:   ttl,
-		items: make(map[interface{}]*entry, cap),
-	}
+	c.items = make(map[interface{}]*entry, cap)
 
 	h := make(ttlHeap, 0, cap)
 	c.heap = &h
 
 	// no need to init the heap as there are no items yet
 
-	return c
+	return &c
 }
 
-// Set a key with value to the cache. Returns true if an item was evicted.
-func (c *Cache) Set(key, value interface{}) bool {
+func (c *cache) Set(key, value interface{}) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -80,7 +115,7 @@ func (c *Cache) Set(key, value interface{}) bool {
 	return evict
 }
 
-func (c *Cache) insertEntry(key, value interface{}) *entry {
+func (c *cache) insertEntry(key, value interface{}) *entry {
 	// must already have a write lock
 
 	ent := &entry{
@@ -89,11 +124,13 @@ func (c *Cache) insertEntry(key, value interface{}) *entry {
 		expires: time.Now().Add(c.ttl),
 	}
 
-	ent.timer = time.AfterFunc(c.ttl, func() {
-		c.lock.Lock()
-		defer c.lock.Unlock()
-		c.removeEntry(ent)
-	})
+	if c.ttl > 0 {
+		ent.timer = time.AfterFunc(c.ttl, func() {
+			c.lock.Lock()
+			defer c.lock.Unlock()
+			c.removeEntry(ent)
+		})
+	}
 
 	heap.Push(c.heap, ent)
 	c.items[key] = ent
@@ -101,7 +138,7 @@ func (c *Cache) insertEntry(key, value interface{}) *entry {
 	return ent
 }
 
-func (c *Cache) updateEntry(e *entry, value interface{}) {
+func (c *cache) updateEntry(e *entry, value interface{}) {
 	// must already have a write lock
 
 	// update with the new value
@@ -111,11 +148,13 @@ func (c *Cache) updateEntry(e *entry, value interface{}) {
 	c.resetEntryTTL(e)
 }
 
-func (c *Cache) resetEntryTTL(e *entry) {
+func (c *cache) resetEntryTTL(e *entry) {
 	// must already have a write lock
 
 	// reset the expiration timer
-	e.timer.Reset(c.ttl)
+	if c.ttl > 0 {
+		e.timer.Reset(c.ttl)
+	}
 
 	// set the new expiration time
 	e.expires = time.Now().Add(c.ttl)
@@ -124,7 +163,7 @@ func (c *Cache) resetEntryTTL(e *entry) {
 	heap.Fix(c.heap, e.index)
 }
 
-func (c *Cache) removeEntry(e *entry) {
+func (c *cache) removeEntry(e *entry) {
 	// must already have a write lock
 
 	if e.index >= 0 {
@@ -135,17 +174,15 @@ func (c *Cache) removeEntry(e *entry) {
 	delete(c.items, e.key)
 }
 
-// Get an item from the cache by key. Returns the value if it exists, and a bool
-// stating whether or not it existed.
-func (c *Cache) Get(key interface{}) (interface{}, bool) {
+func (c *cache) Get(key interface{}) (interface{}, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	if ent, ok := c.items[key]; ok {
 		// the item should be automatically removed when it expires, but we
 		// check just to be safe
-		if time.Now().Before(ent.expires) {
-			if c.NoReset != true {
+		if c.ttl == 0 || time.Now().Before(ent.expires) {
+			if !c.NoReset {
 				c.resetEntryTTL(ent)
 			}
 			return ent.value, true
@@ -155,8 +192,7 @@ func (c *Cache) Get(key interface{}) (interface{}, bool) {
 	return nil, false
 }
 
-// Keys returns a slice of all the keys in the cache
-func (c *Cache) Keys() []interface{} {
+func (c *cache) Keys() []interface{} {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -165,7 +201,7 @@ func (c *Cache) Keys() []interface{} {
 	for k, v := range c.items {
 		// the item should be automatically removed when it expires, but we
 		// check just to be safe
-		if time.Now().Before(v.expires) {
+		if c.ttl == 0 || time.Now().Before(v.expires) {
 			keys[i] = k
 		}
 		i++
@@ -174,20 +210,17 @@ func (c *Cache) Keys() []interface{} {
 	return keys
 }
 
-// Len returns the number of items present in the cache
-func (c *Cache) Len() int {
+func (c *cache) Len() int {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return len(c.items)
 }
 
-// Cap returns the total number of items the cache can retain
-func (c *Cache) Cap() int {
+func (c *cache) Cap() int {
 	return c.cap
 }
 
-// Purge removes all items from the cache
-func (c *Cache) Purge() {
+func (c *cache) Purge() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -196,9 +229,7 @@ func (c *Cache) Purge() {
 	c.items = make(map[interface{}]*entry, c.cap)
 }
 
-// Del deletes an item from the cache by key. Returns if an item was actually
-// deleted.
-func (c *Cache) Del(key interface{}) bool {
+func (c *cache) Del(key interface{}) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
