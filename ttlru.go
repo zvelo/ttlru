@@ -9,7 +9,7 @@
 //
 // Which in turn is based on the LRU implementation in groupcache:
 // github.com/golang/groupcache/lru
-package ttlru // import "zvelo.io/ttlru"
+package ttlru
 
 import (
 	"container/heap"
@@ -56,6 +56,12 @@ type Option func(*cache)
 func WithTTL(val time.Duration) Option {
 	return func(c *cache) {
 		c.ttl = val
+	}
+}
+
+func WithNoReset() Option {
+	return func(c *cache) {
+		c.NoReset = true
 	}
 }
 

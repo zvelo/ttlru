@@ -140,10 +140,9 @@ func TestTTL(t *testing.T) {
 		})
 
 		Convey("Item should expired despite Get()", func() {
-			l := New(1, WithTTL(300*time.Millisecond))
+			l := New(1, WithTTL(300*time.Millisecond), WithNoReset())
 			So(l, ShouldNotBeNil)
 			So(l.Set(1, 1), ShouldBeFalse)
-			l.(*cache).NoReset = true
 
 			done := make(chan interface{})
 			time.AfterFunc(200*time.Millisecond, func() {
