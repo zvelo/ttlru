@@ -59,7 +59,7 @@ func WithTTL(val time.Duration) Option {
 	}
 }
 
-func WithNoReset() Option {
+func WithoutReset() Option {
 	return func(c *cache) {
 		c.NoReset = true
 	}

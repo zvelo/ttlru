@@ -140,7 +140,7 @@ func TestTTL(t *testing.T) {
 		})
 
 		Convey("Item should expired despite Get()", func() {
-			l := New(1, WithTTL(300*time.Millisecond), WithNoReset())
+			l := New(1, WithTTL(300*time.Millisecond), WithoutReset())
 			So(l, ShouldNotBeNil)
 			So(l.Set(1, 1), ShouldBeFalse)
 
