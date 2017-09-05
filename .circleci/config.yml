@@ -24,7 +24,7 @@ jobs:
           command: |
             mkdir -p "${TEST_RESULTS}"
             trap "go-junit-report < \"${TEST_RESULTS}/go-test.out\" > \"${TEST_RESULTS}/go-test-report.xml\"" EXIT
-            go test test 2>&1 | tee "${TEST_RESULTS}/go-test.out"
+            go test 2>&1 | tee "${TEST_RESULTS}/go-test.out"
       - run:
           name: Calculate unit test coverage
           command: |
