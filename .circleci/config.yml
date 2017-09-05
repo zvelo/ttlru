@@ -19,13 +19,12 @@ jobs:
             go get -v github.com/jstemmer/go-junit-report
             go get -v github.com/go-playground/overalls
             go get -v github.com/mattn/goveralls
-      - run: make
       - run:
           name: Run unit tests
           command: |
             mkdir -p "${TEST_RESULTS}"
             trap "go-junit-report < \"${TEST_RESULTS}/go-test.out\" > \"${TEST_RESULTS}/go-test-report.xml\"" EXIT
-            make -s test 2>&1 | tee "${TEST_RESULTS}/go-test.out"
+            go test test 2>&1 | tee "${TEST_RESULTS}/go-test.out"
       - run:
           name: Calculate unit test coverage
           command: |
