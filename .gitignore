@@ -1,2 +1,2 @@
-/.acc.out
-/.coveralls-stamp
+/vendor/
+/Gopkg.lock

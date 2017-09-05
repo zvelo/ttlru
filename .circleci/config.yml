@@ -19,7 +19,9 @@ jobs:
             go get -v github.com/jstemmer/go-junit-report
             go get -v github.com/go-playground/overalls
             go get -v github.com/mattn/goveralls
-            go test -v -i
+            go get -v github.com/golang/dep/cmd/dep
+
+            dep ensure
       - run:
           name: Run unit tests
           command: |
