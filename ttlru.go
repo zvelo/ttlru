@@ -202,15 +202,13 @@ func (c *cache) Keys() []interface{} {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	keys := make([]interface{}, len(c.items))
-	i := 0
+	keys := make([]interface{}, 0, len(c.items))
 	for k, v := range c.items {
 		// the item should be automatically removed when it expires, but we
 		// check just to be safe
 		if c.ttl == 0 || time.Now().Before(v.expires) {
-			keys[i] = k
+			keys = append(keys, k)
 		}
-		i++
 	}
 
 	return keys
