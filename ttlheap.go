@@ -7,10 +7,16 @@ func (h ttlHeap) Len() int {
 }
 
 func (h ttlHeap) Less(i, j int) bool {
+	if i == j || i < 0 || j < 0 {
+		return false
+	}
 	return h[i].expires.Before(h[j].expires)
 }
 
 func (h ttlHeap) Swap(i, j int) {
+	if i == j || i < 0 || j < 0 {
+		return
+	}
 	h[i], h[j] = h[j], h[i]
 	h[i].index, h[j].index = i, j
 }
@@ -25,6 +31,9 @@ func (h *ttlHeap) Push(x interface{}) {
 func (h *ttlHeap) Pop() interface{} {
 	old := *h
 	n := len(old)
+	if n == 0 {
+		return nil
+	}
 	item := old[n-1]
 	item.index = -1 // for safety
 	*h = old[0 : n-1]

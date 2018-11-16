@@ -1,6 +1,8 @@
 package ttlru
 
 import (
+	"container/heap"
+	"context"
 	"testing"
 	"time"
 
@@ -194,4 +196,33 @@ func TestTTL(t *testing.T) {
 			So(v, ShouldEqual, 2)
 		})
 	})
+}
+
+func TestTTLAfterPurge(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	l := New(1, WithTTL(10*time.Millisecond))
+	l.Set("bug", "foo")
+
+	l.Purge()
+
+	// the bug caused a panic here in a different goroutine, so it couldn't be
+	// recovered in the test.
+	// if the test completes successfully, then there was obviously no panic
+
+	<-ctx.Done()
+}
+
+func TestPopEmptyHeap(t *testing.T) {
+	var h ttlHeap
+	heap.Push(&h, &entry{value: 1})
+	heap.Pop(&h)
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("recovered from panic: %+v", r)
+		}
+	}()
+
+	heap.Pop(&h)
 }
