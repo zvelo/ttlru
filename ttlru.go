@@ -228,6 +228,10 @@ func (c *cache) Purge() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	for _, e := range c.items {
+		e.index = -1
+	}
+
 	h := make(ttlHeap, 0, c.cap)
 	c.heap = &h
 	c.items = make(map[interface{}]*entry, c.cap)
