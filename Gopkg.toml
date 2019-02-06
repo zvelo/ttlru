@@ -1,8 +1,0 @@
-[prune]
-  unused-packages = true
-  non-go = true
-  go-tests = true
-
-[[constraint]]
-  name = "github.com/smartystreets/goconvey"
-  version = "1.6.3"
