@@ -6,196 +6,193 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/require"
 )
 
-func TestTTL(t *testing.T) {
-	Convey("TestTTL", t, func() {
-		Convey("General functionality", func() {
-			l := New(128, WithTTL(2*time.Second))
-			So(l, ShouldNotBeNil)
-			So(l.Len(), ShouldEqual, 0)
-			So(l.Cap(), ShouldEqual, 128)
+func TestGeneral(t *testing.T) {
+	l := New(128, WithTTL(2*time.Second))
 
-			for i := 0; i < 128; i++ {
-				So(l.Set(i, i), ShouldBeFalse)
-			}
+	require.NotNil(t, l)
+	require.Equal(t, 0, l.Len())
+	require.Equal(t, 128, l.Cap())
 
-			So(l.Len(), ShouldEqual, 128)
-			So(l.Cap(), ShouldEqual, 128)
+	for i := 0; i < 128; i++ {
+		require.False(t, l.Set(i, i))
+	}
 
-			for i := 128; i < 256; i++ {
-				So(l.Set(i, i), ShouldBeTrue)
-			}
+	require.Equal(t, 128, l.Len())
+	require.Equal(t, 128, l.Cap())
 
-			So(l.Len(), ShouldEqual, 128)
-			So(l.Cap(), ShouldEqual, 128)
+	for i := 128; i < 256; i++ {
+		require.True(t, l.Set(i, i))
+	}
 
-			for _, k := range l.Keys() {
-				v, ok := l.Get(k)
-				So(ok, ShouldBeTrue)
-				So(v, ShouldEqual, k)
-			}
+	require.Equal(t, 128, l.Len())
+	require.Equal(t, 128, l.Cap())
 
-			for i := 0; i < 128; i++ {
-				val, ok := l.Get(i)
-				So(ok, ShouldBeFalse)
-				So(val, ShouldBeNil)
-			}
+	for _, k := range l.Keys() {
+		v, ok := l.Get(k)
+		require.True(t, ok)
+		require.Equal(t, v, k)
+	}
 
-			for i := 128; i < 256; i++ {
-				val, ok := l.Get(i)
-				So(ok, ShouldBeTrue)
-				So(val, ShouldEqual, i)
-			}
+	for i := 0; i < 128; i++ {
+		val, ok := l.Get(i)
+		require.False(t, ok)
+		require.Nil(t, val)
+	}
 
-			for i := 128; i < 192; i++ {
-				So(l.Del(i), ShouldBeTrue)
-				val, ok := l.Get(i)
-				So(ok, ShouldBeFalse)
-				So(val, ShouldBeNil)
-			}
+	for i := 128; i < 256; i++ {
+		val, ok := l.Get(i)
+		require.True(t, ok)
+		require.Equal(t, val, i)
+	}
 
-			done := make(chan interface{})
+	for i := 128; i < 192; i++ {
+		require.True(t, l.Del(i))
+		val, ok := l.Get(i)
+		require.False(t, ok)
+		require.Nil(t, val)
+	}
 
-			time.AfterFunc(3*time.Second, func() {
-				Convey("TTL Works", t, func() {
-					So(l.Len(), ShouldEqual, 0)
-					So(l.Cap(), ShouldEqual, 128)
+	done := make(chan interface{})
 
-					So(l.Set(0, 0), ShouldBeFalse)
-					So(l.Len(), ShouldEqual, 1)
-					So(l.Cap(), ShouldEqual, 128)
+	time.AfterFunc(3*time.Second, func() {
+		require.Equal(t, 0, l.Len())
+		require.Equal(t, 128, l.Cap())
 
-					l.Purge()
-					So(l.Len(), ShouldEqual, 0)
-					So(l.Cap(), ShouldEqual, 128)
+		require.Equal(t, 0, l.Len())
+		require.Equal(t, 128, l.Cap())
 
-					val, ok := l.Get(200)
-					So(ok, ShouldBeFalse)
-					So(val, ShouldBeNil)
+		require.False(t, l.Set(0, 0))
+		require.Equal(t, 1, l.Len())
+		require.Equal(t, 128, l.Cap())
 
-					done <- true
-				})
-			})
+		l.Purge()
+		require.Equal(t, 0, l.Len())
+		require.Equal(t, 128, l.Cap())
 
-			<-done
-		})
+		val, ok := l.Get(200)
+		require.False(t, ok)
+		require.Nil(t, val)
 
-		Convey("Add returns properly", func() {
-			l := New(1, WithTTL(2*time.Second))
-			So(l, ShouldNotBeNil)
-			So(l.Len(), ShouldEqual, 0)
-			So(l.Cap(), ShouldEqual, 1)
-
-			So(l.Set(1, 1), ShouldBeFalse)
-			So(l.Len(), ShouldEqual, 1)
-			So(l.Cap(), ShouldEqual, 1)
-
-			So(l.Set(2, 2), ShouldBeTrue)
-			So(l.Len(), ShouldEqual, 1)
-			So(l.Cap(), ShouldEqual, 1)
-		})
-
-		Convey("Invalid creation", func() {
-			So(New(0, WithTTL(1)), ShouldBeNil)
-			So(New(-1, WithTTL(1)), ShouldBeNil)
-			So(New(1, WithTTL(-1)), ShouldBeNil)
-		})
-
-		Convey("Set should also update", func() {
-			l := New(1, WithTTL(2*time.Second))
-			So(l, ShouldNotBeNil)
-			So(l.Len(), ShouldEqual, 0)
-			So(l.Cap(), ShouldEqual, 1)
-
-			So(l.Set(1, 1), ShouldBeFalse)
-			So(l.Len(), ShouldEqual, 1)
-			So(l.Cap(), ShouldEqual, 1)
-			v, ok := l.Get(1)
-			So(ok, ShouldBeTrue)
-			So(v, ShouldEqual, 1)
-
-			So(l.Set(1, 2), ShouldBeFalse)
-			So(l.Len(), ShouldEqual, 1)
-			So(l.Cap(), ShouldEqual, 1)
-			v, ok = l.Get(1)
-			So(ok, ShouldBeTrue)
-			So(v, ShouldEqual, 2)
-		})
-
-		Convey("Delete should return properly", func() {
-			l := New(1, WithTTL(2*time.Second))
-			So(l, ShouldNotBeNil)
-			So(l.Len(), ShouldEqual, 0)
-			So(l.Cap(), ShouldEqual, 1)
-
-			So(l.Set(1, 1), ShouldBeFalse)
-			So(l.Len(), ShouldEqual, 1)
-			So(l.Cap(), ShouldEqual, 1)
-			v, ok := l.Get(1)
-			So(ok, ShouldBeTrue)
-			So(v, ShouldEqual, 1)
-
-			So(l.Del(1), ShouldBeTrue)
-			So(l.Del(2), ShouldBeFalse)
-		})
-
-		Convey("Item should expired despite Get()", func() {
-			l := New(1, WithTTL(300*time.Millisecond), WithoutReset())
-			So(l, ShouldNotBeNil)
-			So(l.Set(1, 1), ShouldBeFalse)
-
-			done := make(chan interface{})
-			time.AfterFunc(200*time.Millisecond, func() {
-				Convey("Get() item works", t, func() {
-					v, ok := l.Get(1)
-					So(ok, ShouldBeTrue)
-					So(v, ShouldEqual, 1)
-					done <- true
-				})
-			})
-			<-done
-
-			time.AfterFunc(200*time.Millisecond, func() {
-				Convey("Item is gone despite the Get()", t, func() {
-					v, ok := l.Get(1)
-					So(ok, ShouldBeFalse)
-					So(v, ShouldBeNil)
-					done <- true
-				})
-			})
-			<-done
-		})
-
-		Convey("Without ttl", func() {
-			l := New(2)
-			So(l, ShouldNotBeNil)
-
-			So(l.Set(1, 1), ShouldBeFalse)
-			v, ok := l.Get(1)
-			So(ok, ShouldBeTrue)
-			So(v, ShouldEqual, 1)
-
-			So(l.Set(2, 2), ShouldBeFalse)
-			v, ok = l.Get(2)
-			So(ok, ShouldBeTrue)
-			So(v, ShouldEqual, 2)
-
-			So(l.Set(3, 3), ShouldBeTrue)
-			v, ok = l.Get(3)
-			So(ok, ShouldBeTrue)
-			So(v, ShouldEqual, 3)
-
-			v, ok = l.Get(1)
-			So(ok, ShouldBeFalse)
-			So(v, ShouldBeNil)
-
-			v, ok = l.Get(2)
-			So(ok, ShouldBeTrue)
-			So(v, ShouldEqual, 2)
-		})
+		done <- true
 	})
+
+	<-done
+}
+
+func TestAddReturnsProperly(t *testing.T) {
+	l := New(1, WithTTL(2*time.Second))
+	require.NotNil(t, l)
+	require.Equal(t, 0, l.Len())
+	require.Equal(t, 1, l.Cap())
+
+	require.False(t, l.Set(1, 1))
+	require.Equal(t, 1, l.Len())
+	require.Equal(t, 1, l.Cap())
+
+	require.True(t, l.Set(2, 2))
+	require.Equal(t, 1, l.Len())
+	require.Equal(t, 1, l.Cap())
+}
+
+func TestInvalidCreation(t *testing.T) {
+	require.Nil(t, New(0, WithTTL(1)))
+	require.Nil(t, New(-1, WithTTL(1)))
+	require.Nil(t, New(1, WithTTL(-1)))
+}
+
+func TestSetShouldAlsoUpdate(t *testing.T) {
+	l := New(1, WithTTL(2*time.Second))
+	require.NotNil(t, l)
+	require.Equal(t, 0, l.Len())
+	require.Equal(t, 1, l.Cap())
+
+	require.False(t, l.Set(1, 1))
+	require.Equal(t, 1, l.Len())
+	require.Equal(t, 1, l.Cap())
+
+	v, ok := l.Get(1)
+	require.True(t, ok)
+	require.Equal(t, 1, v)
+
+	require.False(t, l.Set(1, 2))
+	require.Equal(t, 1, l.Len())
+	require.Equal(t, 1, l.Cap())
+
+	v, ok = l.Get(1)
+	require.True(t, ok)
+	require.Equal(t, 2, v)
+}
+
+func TestDeleteShouldReturnProperly(t *testing.T) {
+	l := New(1, WithTTL(2*time.Second))
+	require.NotNil(t, l)
+	require.Equal(t, 0, l.Len())
+	require.Equal(t, 1, l.Cap())
+
+	require.False(t, l.Set(1, 1))
+	require.Equal(t, 1, l.Len())
+	require.Equal(t, 1, l.Cap())
+
+	v, ok := l.Get(1)
+	require.True(t, ok)
+	require.Equal(t, 1, v)
+
+	require.True(t, l.Del(1))
+	require.False(t, l.Del(2))
+}
+
+func TestItemShouldExpireDespiteGet(t *testing.T) {
+	l := New(1, WithTTL(300*time.Millisecond), WithoutReset())
+	require.NotNil(t, l)
+	require.False(t, l.Set(1, 1))
+
+	done := make(chan interface{})
+	time.AfterFunc(200*time.Millisecond, func() {
+		v, ok := l.Get(1)
+		require.True(t, ok)
+		require.Equal(t, 1, v)
+		done <- true
+	})
+	<-done
+
+	time.AfterFunc(200*time.Millisecond, func() {
+		v, ok := l.Get(1)
+		require.False(t, ok)
+		require.Nil(t, v)
+		done <- true
+	})
+	<-done
+}
+
+func TestWithoutTTL(t *testing.T) {
+	l := New(2)
+	require.NotNil(t, l)
+
+	require.False(t, l.Set(1, 1))
+	v, ok := l.Get(1)
+	require.True(t, ok)
+	require.Equal(t, 1, v)
+
+	require.False(t, l.Set(2, 2))
+	v, ok = l.Get(2)
+	require.True(t, ok)
+	require.Equal(t, 2, v)
+
+	require.True(t, l.Set(3, 3))
+	v, ok = l.Get(3)
+	require.True(t, ok)
+	require.Equal(t, 3, v)
+
+	v, ok = l.Get(1)
+	require.False(t, ok)
+	require.Nil(t, v)
+
+	v, ok = l.Get(2)
+	require.True(t, ok)
+	require.Equal(t, 2, v)
 }
 
 func TestTTLAfterPurge(t *testing.T) {
