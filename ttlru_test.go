@@ -223,3 +223,26 @@ func TestPopEmptyHeap(t *testing.T) {
 
 	heap.Pop(&h)
 }
+
+func TestFullCacheTTLEviction(t *testing.T) {
+	// Test that when an item with TTL is evicted, the TTL timer is cancelled
+	// Otherwise, the key will be deleted earlier than it should
+	l := New(5, WithTTL(1*time.Second))
+
+	for i := 0; i < 6; i++ {
+		l.Set(i, "test")
+		if i == 0 {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+
+	// 0 should have been evicted
+	_, ok := l.Get(0)
+	require.False(t, ok)
+	// add 0 back in
+	l.Set(0, "test")
+	time.Sleep(500 * time.Millisecond)
+	// 0 should still be there
+	_, ok = l.Get(0)
+	require.True(t, ok)
+}
