@@ -176,6 +176,11 @@ func (c *cache) removeEntry(e *entry) {
 		heap.Remove(c.heap, e.index)
 	}
 
+	// if a ttl was set, stop the timer to avoid leaking timers
+	if e.timer != nil {
+		e.timer.Stop()
+	}
+
 	// delete the item from the map
 	delete(c.items, e.key)
 }
