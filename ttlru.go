@@ -25,6 +25,7 @@ type entry struct {
 	timer   *time.Timer
 }
 
+// Cache interface.
 type Cache interface {
 	// Set a key with value to the cache. Returns true if an item was
 	// evicted.
@@ -51,14 +52,17 @@ type Cache interface {
 	Del(key interface{}) bool
 }
 
+// Option type.
 type Option func(*cache)
 
+// WithTTL option.
 func WithTTL(val time.Duration) Option {
 	return func(c *cache) {
 		c.ttl = val
 	}
 }
 
+// WithoutReset option.
 func WithoutReset() Option {
 	return func(c *cache) {
 		c.NoReset = true
