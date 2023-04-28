@@ -1,19 +1,19 @@
 package ttlru
 
-type ttlHeap []*entry
+type ttlHeap[K comparable, V any] []*entry[K, V]
 
-func (h ttlHeap) Len() int {
+func (h ttlHeap[K, V]) Len() int {
 	return len(h)
 }
 
-func (h ttlHeap) Less(i, j int) bool {
+func (h ttlHeap[K, V]) Less(i, j int) bool {
 	if i == j || i < 0 || j < 0 {
 		return false
 	}
 	return h[i].expires.Before(h[j].expires)
 }
 
-func (h ttlHeap) Swap(i, j int) {
+func (h ttlHeap[K, V]) Swap(i, j int) {
 	if i == j || i < 0 || j < 0 {
 		return
 	}
@@ -21,14 +21,14 @@ func (h ttlHeap) Swap(i, j int) {
 	h[i].index, h[j].index = i, j
 }
 
-func (h *ttlHeap) Push(x interface{}) {
+func (h *ttlHeap[K, V]) Push(x interface{}) {
 	n := len(*h)
-	item := x.(*entry)
+	item := x.(*entry[K, V])
 	item.index = n
 	*h = append(*h, item)
 }
 
-func (h *ttlHeap) Pop() interface{} {
+func (h *ttlHeap[K, V]) Pop() interface{} {
 	old := *h
 	n := len(old)
 	if n == 0 {

@@ -1,4 +1,4 @@
-module zvelo.io/ttlru
+module zvelo.io/ttlru/v2
 
 go 1.20
 

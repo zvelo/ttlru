@@ -17,26 +17,26 @@ import (
 	"time"
 )
 
-type entry struct {
-	key     interface{}
-	value   interface{}
+type entry[K comparable, V any] struct {
+	key     K
+	value   V
 	index   int
 	expires time.Time
 	timer   *time.Timer
 }
 
 // Cache interface.
-type Cache interface {
+type Cache[K comparable, V any] interface {
 	// Set a key with value to the cache. Returns true if an item was
 	// evicted.
-	Set(key, value interface{}) bool
+	Set(key K, value V) bool
 
 	// Get an item from the cache by key. Returns the value if it exists,
 	// and a bool stating whether or not it existed.
-	Get(key interface{}) (interface{}, bool)
+	Get(key K) (V, bool)
 
 	// Keys returns a slice of all the keys in the cache
-	Keys() []interface{}
+	Keys() []K
 
 	// Len returns the number of items present in the cache
 	Len() int
@@ -49,52 +49,57 @@ type Cache interface {
 
 	// Del deletes an item from the cache by key. Returns if an item was
 	// actually deleted.
-	Del(key interface{}) bool
+	Del(key K) bool
 }
 
 // Option type.
-type Option func(*cache)
+type Option func(*configuration)
 
 // WithTTL option.
 func WithTTL(val time.Duration) Option {
-	return func(c *cache) {
+	return func(c *configuration) {
 		c.ttl = val
 	}
 }
 
 // WithoutReset option.
 func WithoutReset() Option {
-	return func(c *cache) {
+	return func(c *configuration) {
 		c.NoReset = true
 	}
 }
 
 // cache is the type that implements the ttlru
-type cache struct {
-	cap     int
+type cache[K comparable, V any] struct {
+	cap int
+	configuration
+	items map[K]*entry[K, V]
+	heap  *ttlHeap[K, V]
+	lock  sync.RWMutex
+}
+
+// configuration type
+type configuration struct {
 	ttl     time.Duration
-	items   map[interface{}]*entry
-	heap    *ttlHeap
-	lock    sync.RWMutex
 	NoReset bool
 }
 
 // New creates a new Cache with cap entries that expire after ttl has
 // elapsed since the item was added, modified or accessed.
-func New(cap int, opts ...Option) Cache {
-	c := cache{cap: cap}
+func New[K comparable, V any](cap int, opts ...Option) Cache[K, V] {
+	c := cache[K, V]{cap: cap}
 
 	for _, opt := range opts {
-		opt(&c)
+		opt(&c.configuration)
 	}
 
 	if c.cap <= 0 || c.ttl < 0 {
 		return nil
 	}
 
-	c.items = make(map[interface{}]*entry, cap)
+	c.items = make(map[K]*entry[K, V], cap)
 
-	h := make(ttlHeap, 0, cap)
+	h := make(ttlHeap[K, V], 0, cap)
 	c.heap = &h
 
 	// no need to init the heap as there are no items yet
@@ -102,7 +107,7 @@ func New(cap int, opts ...Option) Cache {
 	return &c
 }
 
-func (c *cache) Set(key, value interface{}) bool {
+func (c *cache[K, V]) Set(key K, value V) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -125,10 +130,10 @@ func (c *cache) Set(key, value interface{}) bool {
 	return evict
 }
 
-func (c *cache) insertEntry(key, value interface{}) *entry {
+func (c *cache[K, V]) insertEntry(key K, value V) *entry[K, V] {
 	// must already have a write lock
 
-	ent := &entry{
+	ent := &entry[K, V]{
 		key:     key,
 		value:   value,
 		expires: time.Now().Add(c.ttl),
@@ -148,7 +153,7 @@ func (c *cache) insertEntry(key, value interface{}) *entry {
 	return ent
 }
 
-func (c *cache) updateEntry(e *entry, value interface{}) {
+func (c *cache[K, V]) updateEntry(e *entry[K, V], value V) {
 	// must already have a write lock
 
 	// update with the new value
@@ -158,7 +163,7 @@ func (c *cache) updateEntry(e *entry, value interface{}) {
 	c.resetEntryTTL(e)
 }
 
-func (c *cache) resetEntryTTL(e *entry) {
+func (c *cache[K, V]) resetEntryTTL(e *entry[K, V]) {
 	// must already have a write lock
 
 	// reset the expiration timer
@@ -173,7 +178,7 @@ func (c *cache) resetEntryTTL(e *entry) {
 	heap.Fix(c.heap, e.index)
 }
 
-func (c *cache) removeEntry(e *entry) {
+func (c *cache[K, V]) removeEntry(e *entry[K, V]) {
 	// must already have a write lock
 
 	if e.index >= 0 {
@@ -189,7 +194,7 @@ func (c *cache) removeEntry(e *entry) {
 	delete(c.items, e.key)
 }
 
-func (c *cache) Get(key interface{}) (interface{}, bool) {
+func (c *cache[K, V]) Get(key K) (V, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -204,14 +209,16 @@ func (c *cache) Get(key interface{}) (interface{}, bool) {
 		}
 	}
 
-	return nil, false
+	var v V
+
+	return v, false
 }
 
-func (c *cache) Keys() []interface{} {
+func (c *cache[K, V]) Keys() []K {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	keys := make([]interface{}, 0, len(c.items))
+	keys := make([]K, 0, len(c.items))
 	for k, v := range c.items {
 		// the item should be automatically removed when it expires, but we
 		// check just to be safe
@@ -223,17 +230,17 @@ func (c *cache) Keys() []interface{} {
 	return keys
 }
 
-func (c *cache) Len() int {
+func (c *cache[K, V]) Len() int {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return len(c.items)
 }
 
-func (c *cache) Cap() int {
+func (c *cache[K, V]) Cap() int {
 	return c.cap
 }
 
-func (c *cache) Purge() {
+func (c *cache[K, V]) Purge() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -241,12 +248,12 @@ func (c *cache) Purge() {
 		e.index = -1
 	}
 
-	h := make(ttlHeap, 0, c.cap)
+	h := make(ttlHeap[K, V], 0, c.cap)
 	c.heap = &h
-	c.items = make(map[interface{}]*entry, c.cap)
+	c.items = make(map[K]*entry[K, V], c.cap)
 }
 
-func (c *cache) Del(key interface{}) bool {
+func (c *cache[K, V]) Del(key K) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

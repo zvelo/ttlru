@@ -10,7 +10,7 @@ import (
 )
 
 func TestGeneral(t *testing.T) {
-	l := New(128, WithTTL(2*time.Second))
+	l := New[int, int](128, WithTTL(2*time.Second))
 
 	require.NotNil(t, l)
 	require.Equal(t, 0, l.Len())
@@ -39,7 +39,7 @@ func TestGeneral(t *testing.T) {
 	for i := 0; i < 128; i++ {
 		val, ok := l.Get(i)
 		require.False(t, ok)
-		require.Nil(t, val)
+		require.Equal(t, 0, val)
 	}
 
 	for i := 128; i < 256; i++ {
@@ -52,7 +52,7 @@ func TestGeneral(t *testing.T) {
 		require.True(t, l.Del(i))
 		val, ok := l.Get(i)
 		require.False(t, ok)
-		require.Nil(t, val)
+		require.Equal(t, 0, val)
 	}
 
 	done := make(chan interface{})
@@ -74,7 +74,7 @@ func TestGeneral(t *testing.T) {
 
 		val, ok := l.Get(200)
 		require.False(t, ok)
-		require.Nil(t, val)
+		require.Equal(t, 0, val)
 
 		done <- true
 	})
@@ -83,7 +83,7 @@ func TestGeneral(t *testing.T) {
 }
 
 func TestAddReturnsProperly(t *testing.T) {
-	l := New(1, WithTTL(2*time.Second))
+	l := New[int, int](1, WithTTL(2*time.Second))
 	require.NotNil(t, l)
 	require.Equal(t, 0, l.Len())
 	require.Equal(t, 1, l.Cap())
@@ -98,13 +98,13 @@ func TestAddReturnsProperly(t *testing.T) {
 }
 
 func TestInvalidCreation(t *testing.T) {
-	require.Nil(t, New(0, WithTTL(1)))
-	require.Nil(t, New(-1, WithTTL(1)))
-	require.Nil(t, New(1, WithTTL(-1)))
+	require.Nil(t, New[int, int](0, WithTTL(1)))
+	require.Nil(t, New[int, int](-1, WithTTL(1)))
+	require.Nil(t, New[int, int](1, WithTTL(-1)))
 }
 
 func TestSetShouldAlsoUpdate(t *testing.T) {
-	l := New(1, WithTTL(2*time.Second))
+	l := New[int, int](1, WithTTL(2*time.Second))
 	require.NotNil(t, l)
 	require.Equal(t, 0, l.Len())
 	require.Equal(t, 1, l.Cap())
@@ -127,7 +127,7 @@ func TestSetShouldAlsoUpdate(t *testing.T) {
 }
 
 func TestDeleteShouldReturnProperly(t *testing.T) {
-	l := New(1, WithTTL(2*time.Second))
+	l := New[int, int](1, WithTTL(2*time.Second))
 	require.NotNil(t, l)
 	require.Equal(t, 0, l.Len())
 	require.Equal(t, 1, l.Cap())
@@ -145,7 +145,7 @@ func TestDeleteShouldReturnProperly(t *testing.T) {
 }
 
 func TestItemShouldExpireDespiteGet(t *testing.T) {
-	l := New(1, WithTTL(300*time.Millisecond), WithoutReset())
+	l := New[int, int](1, WithTTL(300*time.Millisecond), WithoutReset())
 	require.NotNil(t, l)
 	require.False(t, l.Set(1, 1))
 
@@ -161,14 +161,14 @@ func TestItemShouldExpireDespiteGet(t *testing.T) {
 	time.AfterFunc(200*time.Millisecond, func() {
 		v, ok := l.Get(1)
 		require.False(t, ok)
-		require.Nil(t, v)
+		require.Equal(t, 0, v)
 		done <- true
 	})
 	<-done
 }
 
 func TestWithoutTTL(t *testing.T) {
-	l := New(2)
+	l := New[int, int](2)
 	require.NotNil(t, l)
 
 	require.False(t, l.Set(1, 1))
@@ -188,7 +188,7 @@ func TestWithoutTTL(t *testing.T) {
 
 	v, ok = l.Get(1)
 	require.False(t, ok)
-	require.Nil(t, v)
+	require.Equal(t, 0, v)
 
 	v, ok = l.Get(2)
 	require.True(t, ok)
@@ -198,7 +198,7 @@ func TestWithoutTTL(t *testing.T) {
 func TestTTLAfterPurge(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	l := New(1, WithTTL(10*time.Millisecond))
+	l := New[string, string](1, WithTTL(10*time.Millisecond))
 	l.Set("bug", "foo")
 
 	l.Purge()
@@ -211,8 +211,8 @@ func TestTTLAfterPurge(t *testing.T) {
 }
 
 func TestPopEmptyHeap(t *testing.T) {
-	var h ttlHeap
-	heap.Push(&h, &entry{value: 1})
+	var h ttlHeap[int, int]
+	heap.Push(&h, &entry[int, int]{value: 1})
 	heap.Pop(&h)
 
 	defer func() {
@@ -227,7 +227,7 @@ func TestPopEmptyHeap(t *testing.T) {
 func TestFullCacheTTLEviction(t *testing.T) {
 	// Test that when an item with TTL is evicted, the TTL timer is cancelled
 	// Otherwise, the key will be deleted earlier than it should
-	l := New(5, WithTTL(1*time.Second))
+	l := New[int, string](5, WithTTL(1*time.Second))
 
 	for i := 0; i < 6; i++ {
 		l.Set(i, "test")
